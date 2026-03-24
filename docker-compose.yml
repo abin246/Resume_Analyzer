@@ -1,0 +1,11 @@
+﻿services:
+  localai:
+    image: localai/localai:latest
+    container_name: localai
+    ports:
+      - "8080:8080"
+    environment:
+      - DEBUG=true
+    volumes:
+      - ./models:/models
+    command: ["run", "--models-path", "/models"]
