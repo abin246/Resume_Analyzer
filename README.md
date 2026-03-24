@@ -7,66 +7,65 @@ Full-stack ATS + semantic resume analyzer.
 - LLM: LocalAI (OpenAI-compatible)
 - Persistence: SQLite
 
-## Deploy Target
+## Deploy Target (Render Only)
 
-- Frontend + Backend: Render
-- LocalAI: Hyperstack VM
+- Frontend: Render Static Site
+- Backend: Render Web Service
+- LocalAI: Render Private Service (`pserv`, Docker)
 
-## Files Added for Deployment
+## Deployment Files
 
-- `render.yaml` (Render blueprint for backend + frontend)
-- `backend/.env.render.example` (Render backend env template)
-- `frontend/.env.render.example` (Render frontend env template)
-- `hyperstack/docker-compose.localai.yml` (LocalAI stack for Hyperstack)
-- `hyperstack/README.md` (Hyperstack LocalAI steps)
+- `render.yaml` (all three services)
+- `backend/.env.render.example` (backend env template)
+- `frontend/.env.render.example` (frontend env template)
+- `localai_render/Dockerfile` (LocalAI private service image)
+- `localai_render/models/tinyllama-chat.yaml` (sample model config)
 
 ## Render Setup
 
-### 1) Backend Service (Render Web Service)
+### 1) LocalAI Private Service
 
-Render uses `render.yaml`:
+`render.yaml` defines:
+
+- `type: pserv`
+- `name: resume-analyzer-localai`
+- Docker context: `localai_render`
+- Persistent disk mounted at `/models`
+
+Important:
+
+- Add your model files + YAML config under `/models` on the mounted disk.
+- Keep backend `LOCALAI_MODEL` in sync with model name.
+
+### 2) Backend Web Service
+
+`render.yaml` defines:
 
 - `rootDir: backend`
 - Build: `pip install -r requirements.txt`
 - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Persistent disk at `/var/data`
+- Disk mounted at `/var/data`
 
-Set backend env vars (from `backend/.env.render.example`):
+Backend env values:
 
-- `LOCALAI_BASE_URL=https://<your-hyperstack-localai-domain>/v1`
-- `LOCALAI_MODEL=meta-llama-3.1-8b-instruct`
+- `LOCALAI_BASE_URL=http://resume-analyzer-localai:8080/v1`
+- `LOCALAI_MODEL=tinyllama-chat`
 - `MAX_RESUME_FILE_SIZE_MB=5`
 - `ENABLE_FALLBACK_ANALYZER=true`
 - `DATABASE_PATH=/var/data/resume_analyzer.db`
 - `ALLOWED_ORIGINS=https://<your-render-frontend-domain>`
 
-### 2) Frontend Service (Render Static Site)
+### 3) Frontend Static Site
+
+`render.yaml` defines:
 
 - `rootDir: frontend`
 - Build: `npm ci && npm run build`
-- Publish dir: `dist`
+- Publish: `dist`
 
-Set frontend env var:
+Frontend env value:
 
 - `VITE_API_BASE_URL=https://<your-render-backend-domain>`
-
-## Hyperstack LocalAI Setup
-
-Use:
-
-```bash
-cd hyperstack
-docker compose -f docker-compose.localai.yml up -d
-```
-
-Then verify:
-
-```bash
-curl http://127.0.0.1:8080/v1/models
-```
-
-Expose this service via your Hyperstack networking / reverse proxy with TLS.
-Use that URL in Render backend `LOCALAI_BASE_URL`.
 
 ## Local Development
 
@@ -93,4 +92,4 @@ npm run dev
 ## Notes
 
 - If LocalAI is unavailable, deterministic fallback still runs analysis.
-- User data privacy is scoped by `X-User-Id` (frontend sends a stable browser-local ID automatically).
+- User data privacy is scoped by `X-User-Id` (frontend sends stable browser-local ID).

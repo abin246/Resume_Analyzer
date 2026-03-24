@@ -1,4 +1,16 @@
 ﻿services:
+  - type: pserv
+    name: resume-analyzer-localai
+    runtime: docker
+    rootDir: localai_render
+    envVars:
+      - key: CORS
+        value: "*"
+    disk:
+      name: localai-models
+      mountPath: /models
+      sizeGB: 20
+
   - type: web
     name: resume-analyzer-backend
     runtime: python
@@ -9,9 +21,9 @@
       - key: PYTHON_VERSION
         value: 3.11
       - key: LOCALAI_BASE_URL
-        sync: false
+        value: http://resume-analyzer-localai:8080/v1
       - key: LOCALAI_MODEL
-        value: meta-llama-3.1-8b-instruct
+        value: tinyllama-chat
       - key: MAX_RESUME_FILE_SIZE_MB
         value: 5
       - key: ENABLE_FALLBACK_ANALYZER

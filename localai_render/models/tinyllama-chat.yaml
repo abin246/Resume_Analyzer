@@ -1,0 +1,9 @@
+﻿# Example LocalAI model definition for Render private LocalAI service.
+# Replace with your preferred model config before production.
+
+name: tinyllama-chat
+backend: llama-cpp
+parameters:
+  model: tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+  context_size: 4096
+  threads: 6
