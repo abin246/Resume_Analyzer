@@ -35,8 +35,9 @@
       mountPath: /var/data
       sizeGB: 1
 
-  - type: static
+  - type: web
     name: resume-analyzer-frontend
+    runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
