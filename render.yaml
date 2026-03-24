@@ -18,8 +18,6 @@
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11
       - key: LOCALAI_BASE_URL
         value: http://resume-analyzer-localai:8080/v1
       - key: LOCALAI_MODEL
