@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   analyzeResumeStream,
   getAnalysisById,
-  getLocalAIStatus,
+  // getLocalAIStatus,
   getResumeVersions,
   getResumes,
 } from "./api";
@@ -96,27 +96,27 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    let active = true;
+  // useEffect(() => {
+  //   let active = true;
 
-    async function fetchStatus() {
-      try {
-        const status = await getLocalAIStatus();
-        if (active) setLocalaiStatus(status);
-      } catch {
-        if (active) {
-          setLocalaiStatus({ reachable: false, message: "Unable to check LocalAI status." });
-        }
-      }
-    }
+  //   async function fetchStatus() {
+  //     try {
+  //       const status = await getLocalAIStatus();
+  //       if (active) setLocalaiStatus(status);
+  //     } catch {
+  //       if (active) {
+  //         setLocalaiStatus({ reachable: false, message: "Unable to check LocalAI status." });
+  //       }
+  //     }
+  //   }
 
-    fetchStatus();
-    refreshResumes();
+  //   fetchStatus();
+  //   refreshResumes();
 
-    return () => {
-      active = false;
-    };
-  }, []);
+  //   return () => {
+  //     active = false;
+  //   };
+  // }, []);
 
   useEffect(() => {
     async function loadVersions() {

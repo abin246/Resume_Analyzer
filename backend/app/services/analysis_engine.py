@@ -6,7 +6,7 @@ from app.services.localai_client import generate_ai_enhancements, get_localai_st
 from app.services.resume_parser import ParsedResume
 from app.services.scoring_engine import compute_trustworthy_scores
 from app.services.semantic_engine import compute_semantic_alignment
-from app.services.skill_engine import build_skill_match, extract_top_keywords
+from app.services.skill_engine import build_skill_match, extract_skills, extract_top_keywords
 
 
 def _default_narrative(score: int) -> tuple[str, str]:
@@ -38,7 +38,7 @@ def _fallback_rewrites(parsed_resume: ParsedResume, missing_keywords: list[str])
                 "section": "experience",
                 "original": bullet,
                 "improved": improved,
-                "reason": "Adds role-aligned keywords and improves ATS keyword traceability.",
+                "reason": "Improves impact clarity and keyword relevance.",
             }
         )
 
@@ -47,12 +47,72 @@ def _fallback_rewrites(parsed_resume: ParsedResume, missing_keywords: list[str])
             {
                 "section": "summary",
                 "original": "Professional summary is generic.",
-                "improved": "Results-driven professional with measurable impact and direct alignment to the target role.",
-                "reason": "A tighter summary improves recruiter scan speed and role fit clarity.",
+                "improved": "Results-driven professional with measurable impact, clear strengths, and concise positioning.",
+                "reason": "A tighter summary improves recruiter scan speed.",
             }
         )
 
     return suggestions
+
+
+def _cv_review_mode(parsed_resume: ParsedResume, score: dict, scoring: dict, resume_id: str, version: int) -> dict[str, Any]:
+    resume_skills = extract_skills(parsed_resume.cleaned_text)
+
+    strengths = [
+        "Resume was parsed successfully with extractable structure.",
+        f"Detected {len(resume_skills)} technical/professional skills.",
+        "Scoring evidence is deterministic and auditable.",
+    ]
+
+    gaps = []
+    if not parsed_resume.bullets:
+        gaps.append("Add bullet points under experience/projects for better readability.")
+    if "experience" not in parsed_resume.sections and "work experience" not in parsed_resume.sections:
+        gaps.append("Add a clear Experience section with role-wise responsibilities.")
+    if not parsed_resume.contact.get("email"):
+        gaps.append("Include a professional email in contact details.")
+
+    if not gaps:
+        gaps.append("Resume structure is good; focus on stronger quantified achievements.")
+
+    return {
+        "candidate_summary": (
+            "CV Review Mode: Job description not provided. "
+            "This report evaluates your resume quality, clarity, structure, and impact signals only."
+        ),
+        "ats_recommendation": "CV Review Mode",
+        "strengths": strengths,
+        "gaps": gaps,
+        "suggested_improvements": [
+            "Add quantified outcomes to top bullets (e.g., %, time saved, revenue impact).",
+            "Keep each bullet action-oriented: verb + scope + measurable result.",
+            "Ensure sections appear in this order: Summary, Skills, Experience, Projects, Education.",
+        ],
+        "missing_keywords": [],
+        "skill_extraction": {
+            "all_resume_skills": resume_skills,
+            "required_skills": [],
+            "matched_skills": resume_skills,
+            "missing_skills": [],
+            "coverage_ratio": round(min(len(resume_skills) / 12, 1.0), 4),
+        },
+        "semantic_matches": [
+            {"section": sec, "similarity": 0.5, "evidence_terms": []}
+            for sec in list(parsed_resume.sections.keys())[:8]
+        ],
+        "rewrite_suggestions": _fallback_rewrites(parsed_resume, []),
+        "score": score,
+        "scoring_evidence": scoring["evidence"],
+        "dashboard": scoring["dashboard"],
+        "meta": {
+            "engine": "cv-review-deterministic-v1",
+            "model_used": "none",
+            "fallback_used": True,
+            "confidence": scoring["confidence"],
+            "resume_id": resume_id,
+            "version": version,
+        },
+    }
 
 
 async def run_analysis(
@@ -62,8 +122,28 @@ async def run_analysis(
     resume_id: str,
     version: int,
 ) -> tuple[dict[str, Any], str, bool]:
-    skill_match = build_skill_match(parsed_resume.cleaned_text, job_description)
-    semantic = compute_semantic_alignment(parsed_resume.sections, job_description)
+    jd = (job_description or "").strip()
+    is_cv_only = not jd
+
+    if is_cv_only:
+        skill_match = {
+            "all_resume_skills": extract_skills(parsed_resume.cleaned_text),
+            "required_skills": [],
+            "matched_skills": extract_skills(parsed_resume.cleaned_text),
+            "missing_skills": [],
+            "coverage_ratio": round(min(len(extract_skills(parsed_resume.cleaned_text)) / 12, 1.0), 4),
+        }
+        semantic = {
+            "overall_similarity": 0.5,
+            "section_matches": [
+                {"section": sec, "similarity": 0.5, "evidence_terms": []}
+                for sec in list(parsed_resume.sections.keys())[:8]
+            ],
+        }
+    else:
+        skill_match = build_skill_match(parsed_resume.cleaned_text, jd)
+        semantic = compute_semantic_alignment(parsed_resume.sections, jd)
+
     scoring = compute_trustworthy_scores(
         parsed_resume.cleaned_text,
         parsed_resume.sections,
@@ -71,7 +151,12 @@ async def run_analysis(
         semantic["overall_similarity"],
     )
 
-    jd_keywords = extract_top_keywords(job_description, limit=18)
+    if is_cv_only:
+        base = _cv_review_mode(parsed_resume, scoring["score"], scoring, resume_id, version)
+        validated = ResumeAnalysis.model_validate(base)
+        return validated.model_dump(), "cv-review-deterministic", True
+
+    jd_keywords = extract_top_keywords(jd, limit=18)
     missing_keywords = [k for k in jd_keywords if k not in parsed_resume.cleaned_text.lower()][:15]
 
     summary, recommendation = _default_narrative(scoring["score"]["overall"])
@@ -118,7 +203,7 @@ async def run_analysis(
         if status.get("reachable"):
             context = {
                 "filename": filename,
-                "job_description": job_description,
+                "job_description": jd,
                 "score": base["score"],
                 "missing_keywords": missing_keywords,
                 "matched_skills": skill_match["matched_skills"],

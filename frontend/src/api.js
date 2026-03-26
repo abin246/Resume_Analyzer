@@ -16,13 +16,13 @@ function authHeaders() {
   };
 }
 
-export async function getLocalAIStatus() {
-  const response = await fetch(`${API_BASE_URL}/api/localai/status`, {
-    headers: authHeaders(),
-  });
-  if (!response.ok) throw new Error("Unable to check LocalAI status");
-  return response.json();
-}
+// export async function getLocalAIStatus() {
+//   const response = await fetch(`${API_BASE_URL}/api/localai/status`, {
+//     headers: authHeaders(),
+//   });
+//   if (!response.ok) throw new Error("Unable to check LocalAI status");
+//   return response.json();
+// }
 
 export async function analyzeResume(file, jobDescription) {
   const formData = new FormData();
